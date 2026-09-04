@@ -1,54 +1,26 @@
 import numpy as np
-import pandas as pd
 from scipy.stats import norm
 
+from src.portfolio import align_weights
 
-def calculate_variance_covariance_es(
-    returns: pd.DataFrame,
-    weights: np.ndarray,
-    portfolio_value: float,
-    confidence_level: float = 0.95
-) -> float:
-    """
-    Calculate Variance-Covariance Expected Shortfall (ES)
-    assuming normally distributed portfolio returns.
 
-    Returns ES as a positive monetary loss.
-    """
+def calculate_variance_covariance_es(returns, weights, portfolio_value, confidence_level=0.95):
+    aligned_weights = align_weights(returns, weights)
+    returns_ordered = returns[aligned_weights.index]
+    w = aligned_weights.values
 
-    # Mean return of each asset
-    mean_returns = returns.mean()
+    mean_returns = returns_ordered.mean()
+    portfolio_mean = float(np.dot(w, mean_returns.values))
 
-    # Portfolio mean return
-    portfolio_mean = np.dot(
-        weights,
-        mean_returns
-    )
+    covariance_matrix = returns_ordered.cov()
+    portfolio_variance = float(np.dot(w, np.dot(covariance_matrix.values, w)))
+    portfolio_volatility = np.sqrt(portfolio_variance)
 
-    # Covariance matrix
-    covariance_matrix = returns.cov()
-
-    # Portfolio variance
-    portfolio_variance = np.dot(
-        weights,
-        np.dot(covariance_matrix, weights)
-    )
-
-    # Portfolio volatility
-    portfolio_volatility = np.sqrt(
-        portfolio_variance
-    )
-
-    # Standard normal PDF and quantile
     z_score = norm.ppf(confidence_level)
     pdf_value = norm.pdf(z_score)
 
-    # Expected Shortfall
     es = (
-        portfolio_volatility
-        * pdf_value
-        / (1 - confidence_level)
-        - portfolio_mean
+        portfolio_volatility * pdf_value / (1 - confidence_level) - portfolio_mean
     ) * portfolio_value
 
     return es
